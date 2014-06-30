@@ -1,0 +1,166 @@
+package srv;
+
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+/**
+ * The servlet responsible for administering the server.
+ */
+@WebServlet("/admin")
+public class AdminServlet extends HttpServlet {
+
+	/** The serialisation identifier */
+	private static final long serialVersionUID = 4L;
+	
+	/** The URL to redirect to */
+	private static final String redirectURL =
+			"http://tomcat-teamgoa.rhcloud.com/admin.jsp";
+	
+	/** The password to use to verify that the user is admin */
+	private static final String PASS = "0381749273910grSUj2HDL9371946";
+	
+	/** The next name to generate */
+	private static long nextMockName = 0;
+	
+	/** A mutex to protect the next mock name attribute */
+	private static Object nextMockNameMutex = new Object();
+
+	
+	/**
+	 * Respond to HTTP GET requests.
+	 * <p>
+	 * The requester will be redirected to the admin.jsp page.
+	 * </p>
+	 * @param request - the HTTP GET request received
+	 * @param response - the response to send
+	 */
+	@Override
+	protected void doGet(HttpServletRequest request,
+			HttpServletResponse response)
+					throws ServletException, IOException {
+		if (request.getParameter("pass") != null
+				&& request.getParameter("pass").equals(PASS)) {
+			if (request.getParameter("mock") != null
+					&& !request.getParameter("mock").equals("")) {
+				int count = 0;
+
+				try {
+					count = Integer.parseInt(request.getParameter("mock"));
+				} catch (NumberFormatException e) {
+					Server.print(e);
+				}
+
+				if (count != 0) {
+					synchronized (Server.getClients()) {
+						synchronized (nextMockNameMutex) {
+							for (int i = 0; i < count; i++) {
+								Client mockClient = new Client();
+								mockClient.setName("Mock " + nextMockName);
+								Server.getClients().add(mockClient);
+								nextMockName++;
+							}
+						}
+					}
+				}
+			}
+
+			if (request.getParameter("addver") != null
+					&& !request.getParameter("addver").equals("")) {
+				// Obtain a lock on the permitted versions array
+				synchronized (Server.getPermittedVersions()) {
+					Server.addVersion(request.getParameter("addver"));
+				}
+			}
+
+			if (request.getParameter("remver") != null
+					&& !request.getParameter("remver").equals("")) {
+				// Obtain a lock on the permitted versions array
+				synchronized (Server.getPermittedVersions()) {
+					Server.removeVersion(request.getParameter("remver"));
+				}
+			}
+
+			if (request.getParameter("maxclients") != null
+					&& !request.getParameter("maxclients").equals("")) {
+				try {
+					Server.maxClients = Integer.parseInt(
+							request.getParameter("maxclients"));
+				} catch (NumberFormatException e) {
+					Server.print(e);
+				}
+			}
+
+			if (request.getParameter("maxconnections") != null
+					&& !request.getParameter("maxconnections").equals("")) {
+				try {
+					Server.maxConnections = Integer.parseInt(
+							request.getParameter("maxconnections"));
+				} catch (NumberFormatException e) {
+					Server.print(e);
+				}
+			}
+
+			if (request.getParameter("timeout") != null
+					&& !request.getParameter("timeout").equals("")) {
+				try {
+					Server.timeout = Integer.parseInt(
+							request.getParameter("timeout"));
+				} catch (NumberFormatException e) {
+					Server.print(e);
+				}
+			}
+
+			if (request.getParameter("clearscores") != null
+					&& !request.getParameter("clearscores").equals("")) {
+				// Obtain a lock on the list of high scores
+				synchronized (Server.getHighScores()) {
+					Server.getHighScores().clear();
+				}
+			}
+
+			if (request.getParameter("addname") != null
+					&& !request.getParameter("addname").equals("")
+					&& request.getParameter("addscore") != null
+					&& !request.getParameter("addscore").equals("")) {
+				// Obtain a lock on the list of high scores
+				synchronized (Server.getHighScores()) {
+					Server.addHighScore(request.getParameter("addname"),
+							Long.parseLong(request.getParameter("addscore")));
+				}
+			}
+
+			if (request.getParameter("remscore") != null
+					&& !request.getParameter("remscore").equals("")) {
+				// Obtain a lock on the list of high scores
+				synchronized (Server.getHighScores()) {
+					Server.removeHighScore(request
+							.getParameter("remscore").split("#")[0],
+							Long.parseLong(request
+									.getParameter("remscore").split("#")[1]));
+				}
+			}
+			
+			// Redirect the client to the admin page, with the pass in the URL
+			response.setContentType("text/html");
+			response.setStatus(HttpServletResponse.SC_FOUND);
+			response.setHeader("Location", redirectURL + "?pass=" + PASS);
+		} else {
+			// Redirect the client to the admin page
+			response.setContentType("text/html");
+			response.setStatus(HttpServletResponse.SC_FOUND);
+			response.setHeader("Location", redirectURL);
+		}
+	}
+	
+	public static void reset() {
+		synchronized (nextMockNameMutex) {
+			nextMockName = 0;
+		}
+	}
+	
+}
